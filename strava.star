@@ -1,5 +1,9 @@
 load("render.star", "render")
 load("encoding/base64.star", "base64")
+load("encoding/json.star", "json")
+load("http.star", "http")
+load("cache.star", "cache")
+load("time.star", "time")
 
 ICON = base64.decode("""
 iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAAXNSR0IArs4c6QAA
@@ -51,7 +55,78 @@ Sl5wT6gT02Hiau+LquOf6X23mzcs8RdxsDMGi60yrrXeKWf4OrawSFc05+lYSrUO
 fuZDIrW3ieYc2za7/weGdiGEKu4hggAAAABJRU5ErkJggg==
 """)
 
-def main():
+def get_strava_token(config):
+    token_data = cache.get("strava_token")
+
+    if token_data == None:
+        strava_client_id = config.get("strava_client_id")
+        if strava_client_id == None:
+            fail("Please specify the Strava client ID using the `strava_client_id` parameter")
+
+        strava_code = config.get("strava_code")
+        strava_refresh = config.get("strava_refresh_token")
+        if strava_code == None and strava_refresh == None:
+            fail("Please navigate to the following URL in a browser: https://www.strava.com/oauth/authorize?client_id=%s&redirect_uri=http://localhost/exchange_token&response_type=code&scope=read,activity:read_all" % strava_client_id)
+
+        strava_client_secret = config.get("strava_client_secret")
+        if strava_client_secret == None:
+            fail("Please specify the Strava client secret using the `strava_client_secret` parameter")
+
+        if strava_refresh == None:
+            auth_result = http.post(
+                "https://www.strava.com/api/v3/oauth/token",
+                form_body = {
+                    "client_id": strava_client_id,
+                    "client_secret": strava_client_secret,
+                    "grant_type": "authorization_code",
+                    "code": strava_code
+                }
+            )
+        else:
+            auth_result = http.post(
+                "https://www.strava.com/api/v3/oauth/token",
+                form_body = {
+                    "client_id": strava_client_id,
+                    "client_secret": strava_client_secret,
+                    "grant_type": "refresh_token",
+                    "refresh_token": strava_refresh
+                }
+            )
+
+        if auth_result.status_code != 200:
+            fail("Strava authentication failed with status code %d" % auth_result.status_code)
+
+        token_data = auth_result.body()
+        cache.set("strava_token", auth_result.body(), 31536000)
+
+    token = json.decode(token_data)
+
+    print("Strava refresh token: %s" % token["refresh_token"])
+
+    return token["access_token"]
+
+def main(config):
+    strava_token = get_strava_token(config)
+
+    activities_result = http.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        headers = {
+            "Authorization": "Bearer %s" % strava_token
+        },
+        params = {
+            "per_page": "1"
+        }
+    )
+    if activities_result.status_code != 200:
+        fail("Strava activity retrieval failed with status code %d" % activities_result.status_code)
+
+    activity_data = activities_result.json()
+    activity = activity_data[0]
+
+    name = activity["name"]
+    elapsed_time_s = activity["elapsed_time"]
+    kudos = activity["kudos_count"]
+
     return render.Root(
         child = render.Row(
             expanded = True,
@@ -63,9 +138,9 @@ def main():
                     expanded = True,
                     main_align = "space_evenly",
                     children=[
-                        render.Text("Row1"),
-                        render.Text("Row2"),
-                        render.Text("Row3"),
+                        render.Text(name),
+                        render.Text("%ds" % elapsed_time_s),
+                        render.Text("%d kudos" % kudos),
                     ],
                 ),
             ]
