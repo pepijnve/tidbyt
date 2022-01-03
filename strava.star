@@ -56,23 +56,35 @@ fuZDIrW3ieYc2za7/weGdiGEKu4hggAAAABJRU5ErkJggg==
 """)
 
 def get_strava_token(config):
+    token = None
+
+    strava_client_id = config.get("strava_client_id")
+    strava_client_secret = config.get("strava_client_secret")
+    strava_code = config.get("strava_code")
+    strava_refresh = config.get("strava_refresh_token")
+
     token_data = cache.get("strava_token")
 
-    if token_data == None:
-        strava_client_id = config.get("strava_client_id")
+    if token_data != None:
+        print("Got token from cache")
+        token = json.decode(token_data)
+        if token["expires_at"] - 3600 > time.now().unix:
+            print("Token expiring soon")
+            strava_refresh = token["refresh_token"]
+            token_data = None
+
+    if token == None:
         if strava_client_id == None:
             fail("Please specify the Strava client ID using the `strava_client_id` parameter")
 
-        strava_code = config.get("strava_code")
-        strava_refresh = config.get("strava_refresh_token")
         if strava_code == None and strava_refresh == None:
             fail("Please navigate to the following URL in a browser: https://www.strava.com/oauth/authorize?client_id=%s&redirect_uri=http://localhost/exchange_token&response_type=code&scope=read,activity:read_all" % strava_client_id)
 
-        strava_client_secret = config.get("strava_client_secret")
         if strava_client_secret == None:
             fail("Please specify the Strava client secret using the `strava_client_secret` parameter")
 
         if strava_refresh == None:
+            print("Retrieving new token")
             auth_result = http.post(
                 "https://www.strava.com/api/v3/oauth/token",
                 form_body = {
@@ -83,6 +95,7 @@ def get_strava_token(config):
                 }
             )
         else:
+            print("Refreshing token")
             auth_result = http.post(
                 "https://www.strava.com/api/v3/oauth/token",
                 form_body = {
@@ -97,9 +110,8 @@ def get_strava_token(config):
             fail("Strava authentication failed with status code %d" % auth_result.status_code)
 
         token_data = auth_result.body()
-        cache.set("strava_token", auth_result.body(), 31536000)
-
-    token = json.decode(token_data)
+        cache.set("strava_token", token_data, 31536000)
+        token = json.decode(token_data)
 
     print("Strava refresh token: %s" % token["refresh_token"])
 
