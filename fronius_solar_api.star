@@ -1,8 +1,5 @@
 load("render.star", "render")
-load("encoding/base64.star", "base64")
-load("encoding/json.star", "json")
 load("http.star", "http")
-load("cache.star", "cache")
 load("time.star", "time")
 
 def sort_key(tuple):
