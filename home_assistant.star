@@ -48,7 +48,7 @@ def main(config):
     )
 
     if history_result.status_code != 200:
-            fail("Data retrieval failed with status code %d" % history_result.status_code)
+        fail("Data retrieval failed with status code %d" % history_result.status_code)
 
     history = history_result.json()
 
@@ -86,7 +86,7 @@ def main(config):
     sign = "-" if last_value < 0 else ""
     units = int(abs(last_value))
     tenths = int(abs(last_value * 10) % 10)
-    hundreths = int(abs(last_value * 100) % 10)
+    hundredths = int(abs(last_value * 100) % 10)
 
     return render.Root(
         child = render.Stack(
@@ -106,7 +106,7 @@ def main(config):
                         render.Padding(
                             pad = (1, 0, 0, 1),
                             child = render.Text(
-                                content = "%s%d.%d%d%s" % (sign, units, tenths, hundreths, unit)
+                                content = "%s%d.%d%d%s" % (sign, units, tenths, hundredths, unit)
                             )
                         )
                     ]
