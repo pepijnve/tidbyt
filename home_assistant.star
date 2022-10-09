@@ -70,7 +70,6 @@ def main(config):
             continue
 
         entry = (key, value)
-        print(entry)
         data.append(entry)
 
     data = sort_data(data)
